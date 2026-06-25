@@ -2,7 +2,9 @@ import { EMPTY_OBJECT_TOUCH_STATE } from "@/lib/raycast";
 import { EMPTY_FINGER_TOUCH_STATE, detectFingerTouch } from "@/lib/touchDetection";
 import { getHandRotationState } from "@/lib/handPose";
 import { clamp, getPointDistance, normalizeAngle } from "@/lib/math";
+import { DEFAULT_CALIBRATION_PROFILE } from "@/lib/constants";
 import type {
+  CalibrationProfile,
   GestureState,
   GestureType,
   HandLandmark,
@@ -16,7 +18,6 @@ const MIDDLE_MCP_INDEX = 9;
 const PINKY_MCP_INDEX = 17;
 const TWO_HAND_ROTATION_DEAD_ZONE = 0.025;
 const TWO_HAND_SCALE_DEAD_ZONE = 0.015;
-const HAND_ROTATION_MIN_CONFIDENCE = 0.28;
 
 export const EMPTY_GESTURE_STATE = {
   confidence: 0,
@@ -199,7 +200,10 @@ export function pickPrimaryHand(hands: readonly TrackedHand[]) {
   }, null);
 }
 
-function getSingleHandGestureType(gesture: GestureState): GestureType {
+function getSingleHandGestureType(
+  gesture: GestureState,
+  calibrationProfile: CalibrationProfile
+): GestureType {
   if (gesture.fingerTouch.isTouching) {
     return "touch";
   }
@@ -207,7 +211,7 @@ function getSingleHandGestureType(gesture: GestureState): GestureType {
   if (
     gesture.handRotation &&
     gesture.handRotation.direction !== "neutral" &&
-    gesture.handRotation.confidence >= HAND_ROTATION_MIN_CONFIDENCE
+    gesture.handRotation.confidence >= calibrationProfile.minGestureConfidence
   ) {
     return "handRotate";
   }
@@ -218,7 +222,8 @@ function getSingleHandGestureType(gesture: GestureState): GestureType {
 export function detectGesture(
   hands: readonly TrackedHand[],
   previousGesture: GestureState = EMPTY_GESTURE_STATE,
-  previousTouchCandidateFrames = 0
+  previousTouchCandidateFrames = 0,
+  calibrationProfile: CalibrationProfile = DEFAULT_CALIBRATION_PROFILE
 ): GestureDetectionResult {
   const primaryHand = pickPrimaryHand(hands);
 
@@ -257,9 +262,14 @@ export function detectGesture(
   const touch = detectFingerTouch(
     primaryHand,
     previousGesture.fingerTouch,
-    previousTouchCandidateFrames
+    previousTouchCandidateFrames,
+    calibrationProfile
   );
-  const handRotation = getHandRotationState(primaryHand, previousGesture.handRotation);
+  const handRotation = getHandRotationState(
+    primaryHand,
+    previousGesture.handRotation,
+    calibrationProfile
+  );
   const confidence = Math.max(
     touch.state.confidence,
     handRotation ? handRotation.confidence * 0.72 : 0.18
@@ -278,7 +288,7 @@ export function detectGesture(
   return {
     gesture: {
       ...gesture,
-      type: getSingleHandGestureType(gesture)
+      type: getSingleHandGestureType(gesture, calibrationProfile)
     },
     touchCandidateFrames: touch.candidateFrames
   };

@@ -14,7 +14,9 @@ import {
 } from "@/lib/systemResources";
 import type {
   CameraStatus,
+  DepthState,
   GestureState,
+  RecordingStatus,
   StatusTone,
   SystemResourceStats,
   TrackingStatus
@@ -22,10 +24,12 @@ import type {
 
 type ARStatusBarProps = {
   cameraStatus: CameraStatus;
+  depthState: DepthState;
   fps: number;
   gesture: GestureState;
   handsCount: number;
   hologramTransform: HologramTransform;
+  recordingStatus: RecordingStatus;
   systemResources: SystemResourceStats;
   trackingStatus: TrackingStatus;
 };
@@ -49,10 +53,12 @@ function getHandRotationLabel(gesture: GestureState) {
 
 export function ARStatusBar({
   cameraStatus,
+  depthState,
   fps,
   gesture,
   handsCount,
   hologramTransform,
+  recordingStatus,
   systemResources,
   trackingStatus
 }: ARStatusBarProps) {
@@ -62,6 +68,9 @@ export function ARStatusBar({
     : "Open";
   const handRotationLabel = getHandRotationLabel(gesture);
   const rotationLabel = `${Math.round((hologramTransform.rotation[2] * 180) / Math.PI)}deg`;
+  const depthLabel = depthState.isActive
+    ? depthState.direction.charAt(0).toUpperCase() + depthState.direction.slice(1)
+    : "Off";
   const items: StatusItem[] = [
     {
       icon: Camera,
@@ -124,6 +133,18 @@ export function ARStatusBar({
       value: handRotationLabel
     },
     {
+      icon: Activity,
+      label: "Depth",
+      tone: depthState.isActive && depthState.direction !== "stable" ? "success" : "neutral",
+      value: depthLabel
+    },
+    {
+      icon: TimerReset,
+      label: "REC",
+      tone: recordingStatus === "recording" ? "danger" : "neutral",
+      value: recordingStatus === "recording" ? "On" : recordingStatus
+    },
+    {
       icon: TimerReset,
       label: "FPS",
       tone: "info",
@@ -160,7 +181,7 @@ export function ARStatusBar({
       aria-label="AR status bar"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-100/[0.12] bg-black/48 px-3 py-2 shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:px-6 sm:py-3"
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-[repeat(13,minmax(0,1fr))]">
+      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-[repeat(15,minmax(0,1fr))]">
         {items.map((item) => {
           const Icon = item.icon;
 

@@ -2,6 +2,7 @@
 
 import { Cpu, Crosshair, Hand, Layers3, PanelBottom, RotateCcw, Video } from "lucide-react";
 
+import { DiagnosticsPanel } from "@/components/diagnostics/DiagnosticsPanel";
 import type { HologramTransform } from "@/hooks/useHologramControl";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,22 +15,42 @@ import { CAMERA_STATUS_COPY } from "@/lib/constants";
 import { getGestureLabel } from "@/lib/gestures";
 import { getTrackingStatusLabel } from "@/lib/handTracking";
 import type {
+  ARObject,
+  BrowserSupportState,
+  CalibrationProfile,
   CameraStatus,
+  DepthState,
+  DeviceCapabilities,
   GestureState,
+  PerformanceConfig,
+  QualityMode,
+  RecordingStatus,
   SystemResourceStats,
   TrackingStatus
 } from "@/lib/types";
 
 type DebugPanelProps = {
+  browserSupport: BrowserSupportState;
+  calibrationProfile: CalibrationProfile;
   cameraStatus: CameraStatus;
+  depthState: DepthState;
+  deviceCapabilities: DeviceCapabilities;
   gesture: GestureState;
   handTrackingError: string | null;
   handsCount: number;
   hologramTransform: HologramTransform;
+  isCalibrationLoaded: boolean;
   isOpen: boolean;
   layerVisibility: CameraLayerVisibility;
+  objects: readonly ARObject[];
+  onResetCalibration: () => void;
+  onResetDepthBaseline: () => void;
   onResetTransform: () => void;
   onToggleLayer: (key: CameraLayerKey) => void;
+  performanceConfig: PerformanceConfig;
+  qualityMode: QualityMode;
+  recordingStatus: RecordingStatus;
+  selectedObject: ARObject | null;
   systemResources: SystemResourceStats;
   trackingFps: number;
   trackingStatus: TrackingStatus;
@@ -90,15 +111,27 @@ function formatTuple(tuple: [number, number, number] | null) {
 }
 
 export function DebugPanel({
+  browserSupport,
+  calibrationProfile,
   cameraStatus,
+  depthState,
+  deviceCapabilities,
   gesture,
   handTrackingError,
   handsCount,
   hologramTransform,
+  isCalibrationLoaded,
   isOpen,
   layerVisibility,
+  objects,
+  onResetCalibration,
+  onResetDepthBaseline,
   onResetTransform,
   onToggleLayer,
+  performanceConfig,
+  qualityMode,
+  recordingStatus,
+  selectedObject,
   systemResources,
   trackingFps,
   trackingStatus,
@@ -126,6 +159,26 @@ export function DebugPanel({
       icon: Layers3,
       label: "3D layer",
       value: layerVisibility.showHologram ? "Visible" : "Hidden"
+    },
+    {
+      icon: Layers3,
+      label: "Selected object",
+      value: selectedObject?.id ?? "--"
+    },
+    {
+      icon: Layers3,
+      label: "Object count",
+      value: String(objects.length)
+    },
+    {
+      icon: Layers3,
+      label: "Object locked",
+      value: selectedObject?.locked ? "Yes" : "No"
+    },
+    {
+      icon: Layers3,
+      label: "Object visible",
+      value: selectedObject?.visible ? "Yes" : "No"
     },
     {
       icon: Crosshair,
@@ -275,6 +328,105 @@ export function DebugPanel({
     },
     {
       icon: Crosshair,
+      label: "Depth active",
+      value: depthState.isActive ? "Yes" : "No"
+    },
+    {
+      icon: Crosshair,
+      label: "Depth raw",
+      value: formatNumber(depthState.rawDepth)
+    },
+    {
+      icon: Crosshair,
+      label: "Depth normalized",
+      value: formatNumber(depthState.normalizedDepth)
+    },
+    {
+      icon: Crosshair,
+      label: "Depth delta",
+      value: formatNumber(depthState.delta)
+    },
+    {
+      icon: Crosshair,
+      label: "Depth direction",
+      value: depthState.direction
+    },
+    {
+      icon: Crosshair,
+      label: "Depth confidence",
+      value: formatPercent(depthState.confidence)
+    },
+    {
+      icon: Crosshair,
+      label: "Depth mode",
+      value: "both"
+    },
+    {
+      icon: Cpu,
+      label: "Calibration loaded",
+      value: isCalibrationLoaded ? "Yes" : "No"
+    },
+    {
+      icon: Cpu,
+      label: "Palm size",
+      value: calibrationProfile.averagePalmSize.toFixed(3)
+    },
+    {
+      icon: Cpu,
+      label: "Touch ratio",
+      value: calibrationProfile.touchThresholdRatio.toFixed(3)
+    },
+    {
+      icon: Cpu,
+      label: "Release ratio",
+      value: calibrationProfile.releaseThresholdRatio.toFixed(3)
+    },
+    {
+      icon: Cpu,
+      label: "Rotation sens.",
+      value: `${calibrationProfile.rotationSensitivity.toFixed(2)}x`
+    },
+    {
+      icon: Cpu,
+      label: "Quality mode",
+      value: qualityMode
+    },
+    {
+      icon: Cpu,
+      label: "Target tracking",
+      value: `${performanceConfig.trackingFps} fps`
+    },
+    {
+      icon: Cpu,
+      label: "Particles",
+      value: String(performanceConfig.particleCount)
+    },
+    {
+      icon: Cpu,
+      label: "Render scale",
+      value: `${performanceConfig.renderScale}x`
+    },
+    {
+      icon: Cpu,
+      label: "Device",
+      value: deviceCapabilities.isMobile
+        ? "mobile"
+        : deviceCapabilities.isTablet
+          ? "tablet"
+          : "desktop"
+    },
+    {
+      icon: Cpu,
+      label: "DPR",
+      value: deviceCapabilities.devicePixelRatio.toFixed(2)
+    },
+    {
+      icon: Cpu,
+      label: "Recording",
+      value: recordingStatus
+    },
+    {
+      icon: Crosshair,
       label: "Two hand active",
       value: gesture.isTwoHandActive ? "Yes" : "No"
     },
@@ -357,6 +509,14 @@ export function DebugPanel({
           <RotateCcw aria-hidden="true" className="h-4 w-4" />
           Reset hologram
         </Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button onClick={onResetDepthBaseline} size="sm" variant="secondary">
+            Reset depth
+          </Button>
+          <Button onClick={onResetCalibration} size="sm" variant="secondary">
+            Reset calibration
+          </Button>
+        </div>
 
         <div className="mt-4 border-t border-cyan-100/[0.12] pt-4">
           <p className="mb-2 text-xs font-semibold uppercase text-cyan-100/45">Layer toggles</p>
@@ -376,6 +536,20 @@ export function DebugPanel({
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="mt-4 border-t border-cyan-100/[0.12] pt-4">
+          <DiagnosticsPanel
+            browserSupport={browserSupport}
+            calibrationLoaded={isCalibrationLoaded}
+            cameraStatus={cameraStatus}
+            fps={trackingFps}
+            lastError={handTrackingError}
+            qualityMode={qualityMode}
+            recordingStatus={recordingStatus}
+            selectedObjectId={selectedObject?.id ?? null}
+            trackingStatus={trackingStatus}
+          />
         </div>
       </Card>
     </aside>

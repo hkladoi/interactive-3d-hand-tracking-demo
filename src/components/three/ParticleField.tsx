@@ -5,15 +5,16 @@ import { AdditiveBlending, type Points } from "three";
 import { useFrame } from "@react-three/fiber";
 
 type ParticleFieldProps = {
+  enabled?: boolean;
   isInteracting: boolean;
+  particleCount?: number;
+  reducedMotion?: boolean;
 };
 
-const PARTICLE_COUNT = 360;
+function createParticlePositions(particleCount: number) {
+  const positions = new Float32Array(particleCount * 3);
 
-function createParticlePositions() {
-  const positions = new Float32Array(PARTICLE_COUNT * 3);
-
-  for (let index = 0; index < PARTICLE_COUNT; index += 1) {
+  for (let index = 0; index < particleCount; index += 1) {
     const radius = 0.85 + Math.random() * 2.25;
     const theta = Math.random() * Math.PI * 2;
     const y = (Math.random() - 0.5) * 2.65;
@@ -30,9 +31,14 @@ function createParticlePositions() {
   return positions;
 }
 
-export function ParticleField({ isInteracting }: ParticleFieldProps) {
+export function ParticleField({
+  enabled = true,
+  isInteracting,
+  particleCount = 360,
+  reducedMotion = false
+}: ParticleFieldProps) {
   const pointsRef = useRef<Points>(null);
-  const positions = useMemo(() => createParticlePositions(), []);
+  const positions = useMemo(() => createParticlePositions(particleCount), [particleCount]);
 
   useFrame(({ clock }, delta) => {
     if (!pointsRef.current) {
@@ -40,11 +46,16 @@ export function ParticleField({ isInteracting }: ParticleFieldProps) {
     }
 
     const elapsed = clock.getElapsedTime();
-    const speed = isInteracting ? 0.58 : 0.2;
+    const speed = reducedMotion ? 0.08 : isInteracting ? 0.58 : 0.2;
     pointsRef.current.rotation.y += delta * speed;
     pointsRef.current.rotation.x = Math.sin(elapsed * 0.18) * 0.08;
-    pointsRef.current.position.y = Math.sin(elapsed * (isInteracting ? 1.4 : 0.65)) * 0.035;
+    pointsRef.current.position.y =
+      Math.sin(elapsed * (reducedMotion ? 0.35 : isInteracting ? 1.4 : 0.65)) * 0.035;
   });
+
+  if (!enabled) {
+    return null;
+  }
 
   return (
     <points ref={pointsRef}>

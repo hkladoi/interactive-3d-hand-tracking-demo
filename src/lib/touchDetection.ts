@@ -1,12 +1,17 @@
+import { DEFAULT_CALIBRATION_PROFILE } from "@/lib/constants";
 import { clamp } from "@/lib/math";
-import type { FingerTouchState, HandLandmark, Point2D, TrackedHand } from "@/lib/types";
+import type {
+  CalibrationProfile,
+  FingerTouchState,
+  HandLandmark,
+  Point2D,
+  TrackedHand
+} from "@/lib/types";
 
 const WRIST_INDEX = 0;
 const THUMB_TIP_INDEX = 4;
 const INDEX_TIP_INDEX = 8;
 const MIDDLE_MCP_INDEX = 9;
-const TOUCH_THRESHOLD_RATIO = 0.22;
-const RELEASE_THRESHOLD_RATIO = 0.3;
 const TOUCH_CANDIDATE_FRAMES = 2;
 const MIN_HAND_SCALE = 0.001;
 
@@ -15,7 +20,7 @@ export const EMPTY_FINGER_TOUCH_STATE = {
   distance: Number.POSITIVE_INFINITY,
   indexTip: null,
   isTouching: false,
-  threshold: TOUCH_THRESHOLD_RATIO,
+  threshold: DEFAULT_CALIBRATION_PROFILE.touchThresholdRatio,
   thumbTip: null,
   touchPoint: null
 } satisfies FingerTouchState;
@@ -51,10 +56,14 @@ function getHandScale(landmarks: readonly HandLandmark[]) {
   return Math.max(getLandmarkDistance(wrist, middleMcp), MIN_HAND_SCALE);
 }
 
-function getTouchConfidence(normalizedDistance: number) {
+function getTouchConfidence(
+  normalizedDistance: number,
+  touchThresholdRatio: number,
+  releaseThresholdRatio: number
+) {
   return clamp(
-    (RELEASE_THRESHOLD_RATIO - normalizedDistance) /
-      (RELEASE_THRESHOLD_RATIO - TOUCH_THRESHOLD_RATIO),
+    (releaseThresholdRatio - normalizedDistance) /
+      (releaseThresholdRatio - touchThresholdRatio),
     0,
     1
   );
@@ -63,7 +72,8 @@ function getTouchConfidence(normalizedDistance: number) {
 export function detectFingerTouch(
   hand: TrackedHand,
   previousTouch: FingerTouchState = EMPTY_FINGER_TOUCH_STATE,
-  previousCandidateFrames = 0
+  previousCandidateFrames = 0,
+  calibrationProfile: CalibrationProfile = DEFAULT_CALIBRATION_PROFILE
 ): FingerTouchDetection {
   const thumbTip = hand.landmarks[THUMB_TIP_INDEX];
   const indexTip = hand.landmarks[INDEX_TIP_INDEX];
@@ -78,25 +88,31 @@ export function detectFingerTouch(
 
   const distance = getLandmarkDistance(thumbTip, indexTip);
   const normalizedDistance = distance / handScale;
+  const touchThresholdRatio = calibrationProfile.touchThresholdRatio;
+  const releaseThresholdRatio = calibrationProfile.releaseThresholdRatio;
   const candidateFrames =
-    normalizedDistance <= TOUCH_THRESHOLD_RATIO
+    normalizedDistance <= touchThresholdRatio
       ? Math.min(previousCandidateFrames + 1, TOUCH_CANDIDATE_FRAMES)
       : 0;
   const isTouching = previousTouch.isTouching
-    ? normalizedDistance <= RELEASE_THRESHOLD_RATIO
+    ? normalizedDistance <= releaseThresholdRatio
     : candidateFrames >= TOUCH_CANDIDATE_FRAMES;
 
   return {
     candidateFrames,
     state: {
-      confidence: getTouchConfidence(normalizedDistance),
+      confidence: getTouchConfidence(
+        normalizedDistance,
+        touchThresholdRatio,
+        releaseThresholdRatio
+      ),
       distance: normalizedDistance,
       indexTip: {
         x: indexTip.x,
         y: indexTip.y
       },
       isTouching,
-      threshold: isTouching ? RELEASE_THRESHOLD_RATIO : TOUCH_THRESHOLD_RATIO,
+      threshold: isTouching ? releaseThresholdRatio : touchThresholdRatio,
       thumbTip: {
         x: thumbTip.x,
         y: thumbTip.y

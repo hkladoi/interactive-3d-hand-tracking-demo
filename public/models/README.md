@@ -1,6 +1,6 @@
 # Custom 3D Models
 
-Place `.glb` or `.gltf` files in this folder to use them as the AR hologram model.
+Put `.glb` or `.gltf` files here.
 
 Example:
 
@@ -8,10 +8,10 @@ Example:
 public/models/tree.glb
 ```
 
-Then update `DEFAULT_MODEL_URL` in `src/lib/constants.ts`:
+Then use this URL in the app's Model Selector:
 
-```ts
-export const DEFAULT_MODEL_URL = "/models/tree.glb";
+```txt
+/models/tree.glb
 ```
 
-If the URL is empty or the model fails to load, the app falls back to the built-in hologram object.
+If the model fails to load, the app falls back to the built-in hologram object.

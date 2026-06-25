@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelRightClose, PanelRightOpen, RotateCcw, Square } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, RotateCcw, SlidersHorizontal, Square } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import type { CameraStatus } from "@/lib/types";
 type ARHeaderProps = {
   cameraStatus: CameraStatus;
   isDebugOpen: boolean;
+  onCalibrate: () => void;
   onReset: () => void;
   onStop: () => void;
   onToggleDebug: () => void;
@@ -18,6 +19,7 @@ type ARHeaderProps = {
 export function ARHeader({
   cameraStatus,
   isDebugOpen,
+  onCalibrate,
   onReset,
   onStop,
   onToggleDebug
@@ -37,6 +39,9 @@ export function ARHeader({
           <Badge className="hidden sm:inline-flex" tone={cameraCopy.tone}>
             {cameraCopy.shortLabel}
           </Badge>
+          <Button aria-label="Open calibration" onClick={onCalibrate} size="icon" variant="secondary">
+            <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+          </Button>
           <Button
             aria-label={isDebugOpen ? "Hide debug panel" : "Show debug panel"}
             onClick={onToggleDebug}

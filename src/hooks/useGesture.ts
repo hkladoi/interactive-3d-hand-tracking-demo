@@ -3,9 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 
 import { detectGesture, EMPTY_GESTURE_STATE, getDominantTwoHandType } from "@/lib/gestures";
+import { DEFAULT_CALIBRATION_PROFILE } from "@/lib/constants";
 import { normalizeAngle } from "@/lib/math";
 import { smoothAngle, smoothNumber, smoothPoint } from "@/lib/smoothing";
-import type { FingerTouchState, GestureState, TrackedHand } from "@/lib/types";
+import type {
+  CalibrationProfile,
+  FingerTouchState,
+  GestureState,
+  TrackedHand
+} from "@/lib/types";
 
 const TOUCH_POINT_SMOOTHING = 0.45;
 const CONFIDENCE_SMOOTHING = 0.38;
@@ -73,7 +79,10 @@ function getSmoothedFingerTouch(
   };
 }
 
-export function useGesture(hands: readonly TrackedHand[]) {
+export function useGesture(
+  hands: readonly TrackedHand[],
+  calibrationProfile: CalibrationProfile = DEFAULT_CALIBRATION_PROFILE
+) {
   const previousGestureRef = useRef<GestureState>(EMPTY_GESTURE_STATE);
   const touchCandidateFramesRef = useRef(0);
   const [gesture, setGesture] = useState<GestureState>(EMPTY_GESTURE_STATE);
@@ -82,7 +91,8 @@ export function useGesture(hands: readonly TrackedHand[]) {
     const detection = detectGesture(
       hands,
       previousGestureRef.current,
-      touchCandidateFramesRef.current
+      touchCandidateFramesRef.current,
+      calibrationProfile
     );
     const rawGesture = detection.gesture;
     const previousGesture = previousGestureRef.current;
@@ -123,7 +133,7 @@ export function useGesture(hands: readonly TrackedHand[]) {
     touchCandidateFramesRef.current = detection.touchCandidateFrames;
     previousGestureRef.current = nextGesture;
     setGesture(nextGesture);
-  }, [hands]);
+  }, [calibrationProfile, hands]);
 
   return gesture;
 }

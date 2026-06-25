@@ -15,6 +15,7 @@ import type { TrackedHand, TrackingStatus } from "@/lib/types";
 
 type UseHandTrackingOptions = Readonly<{
   assets?: HandTrackingAssets;
+  targetFps?: number;
 }>;
 
 type UseHandTrackingResult = Readonly<{
@@ -39,6 +40,7 @@ export function useHandTracking(
   options: UseHandTrackingOptions = {}
 ): UseHandTrackingResult {
   const assets = options.assets ?? DEFAULT_HAND_TRACKING_ASSETS;
+  const targetFps = options.targetFps ?? 30;
   const [status, setStatus] = useState<TrackingStatus>("idle");
   const [hands, setHands] = useState<TrackedHand[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export function useHandTracking(
   const framesInWindowRef = useRef(0);
   const handsCountRef = useRef(0);
   const landmarkerRef = useRef<HandLandmarkerInstance | null>(null);
+  const lastDetectedAtRef = useRef(0);
   const runIdRef = useRef(0);
   const statusRef = useRef<TrackingStatus>("idle");
   const trackingActiveRef = useRef(false);
@@ -87,6 +90,7 @@ export function useHandTracking(
     framesInWindowRef.current = 0;
     handsCountRef.current = 0;
     windowStartedAtRef.current = 0;
+    lastDetectedAtRef.current = 0;
     setHands([]);
     setFps(0);
     setErrorMessage(null);
@@ -102,6 +106,8 @@ export function useHandTracking(
 
         const video = videoRef.current;
         const landmarker = landmarkerRef.current;
+        const frameStartedAt = performance.now();
+        const minFrameInterval = 1000 / Math.max(targetFps, 1);
 
         if (!landmarker || !canTrackVideo(video)) {
           clearHands();
@@ -110,8 +116,14 @@ export function useHandTracking(
           return;
         }
 
+        if (frameStartedAt - lastDetectedAtRef.current < minFrameInterval) {
+          animationFrameRef.current = window.requestAnimationFrame(detectFrame);
+          return;
+        }
+
+        lastDetectedAtRef.current = frameStartedAt;
+
         try {
-          const frameStartedAt = performance.now();
           const result = landmarker.detectForVideo(video, frameStartedAt);
           const nextHands = normalizeHandLandmarkerResult(result);
 
@@ -151,7 +163,7 @@ export function useHandTracking(
 
       animationFrameRef.current = window.requestAnimationFrame(detectFrame);
     },
-    [cancelLoop, clearHands, setTrackingStatus, videoRef]
+    [cancelLoop, clearHands, setTrackingStatus, targetFps, videoRef]
   );
 
   const startTracking = useCallback(async () => {

@@ -1,5 +1,7 @@
 import { clamp, getPointDistance, lerpAngleRad, normalizeAngleRad } from "@/lib/math";
+import { DEFAULT_CALIBRATION_PROFILE } from "@/lib/constants";
 import type {
+  CalibrationProfile,
   HandLandmark,
   HandRotationDirection,
   HandRotationState,
@@ -36,7 +38,8 @@ function getDirection(deltaAngle: number): HandRotationDirection {
 
 export function getHandRotationState(
   hand: TrackedHand,
-  previousRotation: HandRotationState | null
+  previousRotation: HandRotationState | null,
+  calibrationProfile: CalibrationProfile = DEFAULT_CALIBRATION_PROFILE
 ): HandRotationState | null {
   const wrist = hand.landmarks[WRIST_INDEX];
   const indexMcp = hand.landmarks[INDEX_MCP_INDEX];
@@ -61,7 +64,8 @@ export function getHandRotationState(
     ? lerpAngleRad(previousRotation.screenAngle, rawScreenAngle, ROTATION_SMOOTHING)
     : rawScreenAngle;
   const deltaAngle = previousRotation
-    ? normalizeAngleRad(screenAngle - previousRotation.screenAngle)
+    ? normalizeAngleRad(screenAngle - previousRotation.screenAngle) *
+      calibrationProfile.rotationSensitivity
     : 0;
   const zDelta = (pinkyMcp.z ?? 0) - (indexMcp.z ?? 0);
 

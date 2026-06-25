@@ -1,6 +1,28 @@
-# Interactive 3D Hand Tracking
+# Interactive 3D Hand Tracking AR Demo
 
-An interactive browser AR demo built with Next.js, MediaPipe hand tracking, and a transparent Three.js hologram layer. The app runs fully on the client: camera frames stay local in the browser, hand landmarks drive gestures, and the 3D object responds to real thumb-index touch, object hit detection, one-hand rotate, plus two-hand scale and rotate.
+## Overview
+
+A client-only browser AR demo built with Next.js, MediaPipe hand tracking, and a transparent Three.js layer. The app combines camera video, live hand landmarks, calibrated gestures, multi-object 3D interaction, custom model fallback, screenshot/recording tools, quality modes, and diagnostics.
+
+Camera frames stay local in the browser. There is no backend, database, authentication, Redux, or external API call.
+
+## Features
+
+- Camera start/stop with permission fallback UI
+- MediaPipe hand tracking from same-origin public assets
+- Landmark overlay with thumb/index touch and object hit feedback
+- Calibration flow stored in localStorage
+- Thumb/index touch drag with object hit detection
+- One-hand palm rotation
+- Two-hand scale and rotate
+- Depth control from MediaPipe hand z-axis
+- Multi-object scene with selection, lock, visibility, reset selected, and reset all
+- Preset object library and custom `/models/*.glb` or `/models/*.gltf` selector
+- Hologram visuals with wireframe, glow, particles, rings, and model fallback
+- Screenshot PNG capture and WEBM recording when browser APIs support it
+- Low/Medium/High/Ultra quality modes
+- Browser-safe CPU/RAM/GPU telemetry, browser support checks, and diagnostics copy
+- Responsive dark cinematic UI
 
 ## Tech Stack
 
@@ -15,77 +37,31 @@ An interactive browser AR demo built with Next.js, MediaPipe hand tracking, and 
 - lucide-react
 - ESLint
 
-No backend, database, authentication, Redux, or external API calls are required.
-
 ## Folder Structure
 
 ```txt
 src/
   app/
-    globals.css
-    layout.tsx
-    page.tsx
   components/
     ar/
-      ARExperience.tsx
-      ARHeader.tsx
-      ARStatusBar.tsx
-      CameraPermissionState.tsx
-      StartCameraScreen.tsx
+    calibration/
     camera/
-      CameraOverlay.tsx
-      CameraView.tsx
+    capture/
     debug/
-      DebugPanel.tsx
+    diagnostics/
     hand/
-      HandLandmarkOverlay.tsx
-      HandTrackingStatus.tsx
+    settings/
     three/
-      HologramObject.tsx
-      HologramRing.tsx
-      ModelHologram.tsx
-      ParticleField.tsx
-      PlaceholderHologram.tsx
-      ThreeViewport.tsx
-      TouchPointMarker.tsx
     ui/
-      Badge.tsx
-      Button.tsx
-      Card.tsx
   hooks/
-    useCamera.ts
-    useClientReady.ts
-    useGesture.ts
-    useHandTracking.ts
-    useHologramControl.ts
-    useSystemResources.ts
-    useTouchProjection.ts
-    useVideoElement.ts
   lib/
-    camera.ts
-    cn.ts
-    constants.ts
-    gestures.ts
-    handPose.ts
-    handLandmarks.ts
-    handTracking.ts
-    math.ts
-    raycast.ts
-    smoothing.ts
-    systemResources.ts
-    touchDetection.ts
-    types.ts
+docs/
 public/
   mediapipe/
   models/
-    README.md
 ```
 
-MediaPipe runtime files live under `public/mediapipe/` so the model and wasm assets are loaded from the same app origin.
-
-Custom `.glb` and `.gltf` files can be placed under `public/models/`.
-
-## How To Run
+## Getting Started
 
 ```bash
 npm install
@@ -94,116 +70,131 @@ npm run dev
 
 Open `http://127.0.0.1:3000` or `http://localhost:3000` in a browser with camera access.
 
-## How To Build
+## Development Commands
 
 ```bash
+npm install
+npm run dev
 npm run lint
 npm run build
+npm run start
 ```
 
-The app is designed so camera and MediaPipe logic run only in client components, avoiding build-time webcam access and SSR `window` errors.
+## Environment Requirements
 
-## How To Use A Custom GLB Model
+- Current Chromium-based browser recommended
+- Camera access through `navigator.mediaDevices.getUserMedia`
+- WebGL support
+- WebAssembly for MediaPipe
+- HTTPS in production for camera access
 
-1. Put the model file in `public/models`.
+## Gesture Guide
+
+- Show your hand to the camera.
+- Touch thumb and index finger together on an object to drag it.
+- Rotate one palm to rotate the selected object.
+- Use two hands to scale or rotate the selected object.
+- Move the primary hand nearer/farther for depth control.
+
+See [docs/GESTURE_GUIDE.md](docs/GESTURE_GUIDE.md).
+
+## Calibration
+
+Use the Calibrate button in the AR header. The wizard collects open-hand, thumb/index touch, rotate-left, and rotate-right samples, then stores a profile in localStorage.
+
+Calibration controls:
+
+- Use Calibration
+- Recalibrate
+- Reset to Default
+
+The gesture layer uses calibrated touch thresholds, release thresholds, rotation sensitivity, depth sensitivity, and minimum confidence.
+
+## Multi-object Interaction
+
+The default scene includes:
+
+- Main Hologram
+- Crystal
+- Energy Orb
+
+Touching an object selects it. Only the selected unlocked object receives drag, rotate, scale, and depth transforms. Use the Object toolbar to select, show/hide, lock/unlock, reset selected, or reset all objects.
+
+## Custom Models
+
+Put `.glb` or `.gltf` files into `public/models`.
+
+Example:
 
 ```txt
 public/models/tree.glb
 ```
 
-2. Update `DEFAULT_MODEL_URL` in `src/lib/constants.ts`.
+Then use:
 
-```ts
-export const DEFAULT_MODEL_URL = "/models/tree.glb";
+```txt
+/models/tree.glb
 ```
 
-3. Run the app or build it.
+The model selector validates `/models/*.glb` and `/models/*.gltf`. Missing or invalid model files fall back to built-in hologram geometry.
 
-```bash
-npm run dev
-npm run build
-```
+## Screenshot & Recording
 
-If `DEFAULT_MODEL_URL` is empty or the model fails to load, the app renders the built-in hologram fallback instead of crashing.
+Use Capture controls in the AR screen:
 
-## Features
+- Screenshot creates `ar-hand-demo-screenshot-yyyyMMdd-HHmmss.png`.
+- Record creates `ar-hand-demo-recording-yyyyMMdd-HHmmss.webm` when `MediaRecorder` and canvas capture are supported.
+- Download Last Capture saves the latest image or video.
 
-- Start camera screen with local privacy notice
-- Camera permission fallback screens
-- Client-side MediaPipe hand tracking
-- Canvas hand landmark overlay
-- Transparent Three.js AR layer
-- Hologram object with wireframe, glow, particles, and rings
-- Optional `.glb` or `.gltf` hologram model with built-in fallback
-- Thumb-index touch detection with dynamic hand-size thresholds and hysteresis
-- Screen-space object hit detection before drag starts
-- Touch marker on the hologram when the hand contact hits the object
-- One-hand palm rotation for rotating the hologram
-- Two-hand scale and rotate
-- Browser-safe CPU, RAM, and GPU telemetry next to FPS
-- Debug panel with layer toggles, gesture data, FPS, and reset
-- Compact mobile status bar and collapsible debug UI
-- Production hints for loading, no-hand, touch, one-hand rotate, and two-hand gestures
+Unsupported recording APIs show a UI error and do not crash the app.
 
-## System Telemetry
+## Performance Modes
 
-The status bar shows CPU, RAM, and GPU next to FPS using browser-safe APIs only:
+Quality modes are Low, Medium, High, and Ultra. The selected mode is stored in localStorage and controls:
 
-- CPU shows logical core count from `navigator.hardwareConcurrency`; CPU name and usage are not exposed by browsers.
-- RAM shows an estimate from `navigator.deviceMemory` and JavaScript heap usage from `performance.memory` when supported.
-- GPU shows the WebGL renderer name when `WEBGL_debug_renderer_info` is available; GPU usage and VRAM are not exposed by browsers.
+- Particle count
+- Tracking FPS throttle
+- Render scale
+- Glow/particle enablement
+- Recording FPS
 
-Unsupported values are shown explicitly instead of being guessed.
+Mobile defaults to lower quality; desktop defaults higher.
 
-## Gesture Guide
+## Mobile Support
 
-- Show your hand to the camera to activate tracking.
-- Touch thumb tip and index finger tip together on top of the hologram to start dragging.
-- Touching outside the hologram shows a touch state, but it will not move the object.
-- Rotate one visible hand to rotate the hologram without touching it.
-- Use two hands and move them farther apart or closer together to scale the hologram.
-- Rotate two hands around each other to rotate the hologram.
-- Use Reset hologram to restore position, rotation, and scale.
-- Use Stop Camera to stop both the camera stream and tracking loop.
+The UI uses compact controls, responsive panels, large enough buttons, and reduced animation when `prefers-reduced-motion` is enabled. Use HTTPS on mobile devices in production.
 
-## Gesture Architecture
+## Browser Support
 
-- `touchDetection.ts` computes real thumb-index contact using palm-relative thresholds, hysteresis, and candidate frames.
-- `handPose.ts` computes mirrored screen-space palm angle plus coarse yaw, pitch, and roll for one-hand rotation.
-- `raycast.ts` currently performs lightweight screen-space object hit detection for the hologram and custom models.
-- `useGesture.ts` exposes hover, touch, drag, one-hand rotate, and two-hand gestures without UI-specific logic.
-- `useHologramControl.ts` maps gestures into a smoothed Three.js transform and clamps scale between `0.5` and `2.5`.
+Diagnostics check:
+
+- Camera
+- WebGL
+- MediaRecorder
+- Canvas capture stream
+- LocalStorage
+- WebAssembly
+
+Missing features disable or degrade only the related capability.
 
 ## Troubleshooting
 
-### Camera permission denied
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
-Allow camera access in the browser permission prompt. If access was previously blocked, open the site permissions for this page, enable camera access, then press Try Again.
+Common issues:
 
-### Browser does not support camera
+- Camera permission denied: enable site camera permission.
+- MediaPipe fails: verify `public/mediapipe` assets.
+- Object does not move: touch thumb/index on top of the object.
+- Recording unsupported: use a browser with `MediaRecorder` and `canvas.captureStream`.
+- Custom model missing: check the file path under `public/models`.
 
-Use a current Chromium-based browser or another browser that supports `navigator.mediaDevices.getUserMedia`. Camera and tracking require a secure browser context such as `localhost`, `127.0.0.1`, or HTTPS.
+## Deployment
 
-### MediaPipe does not load
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-Check that `public/mediapipe/wasm` and `public/mediapipe/models/hand_landmarker.task` exist. The debug panel and hand tracking status panel will show an error while keeping the camera and hologram UI usable.
+Camera requires HTTPS in production. `localhost` and `127.0.0.1` work during development.
 
-### Custom model does not load
+## QA Checklist
 
-Check that the file exists under `public/models` and that `DEFAULT_MODEL_URL` starts with `/models/`. The model loader catches failures and falls back to the built-in hologram object.
-
-### No hand detected
-
-Move your hand into the camera view with good lighting. Keep the palm and fingers visible for the first detection, then try touch, one-hand rotate, or two-hand gestures.
-
-### Touch does not move the object
-
-Make sure the thumb-index contact point is over the hologram. The app intentionally requires a real contact plus object hit before drag starts, so near-but-not-touching fingers or touches outside the object will not move it.
-
-### Low performance
-
-Close other camera or GPU-heavy apps, reduce browser tabs, and use a desktop Chromium browser when possible. The demo uses a lightweight particle field and avoids heavy external assets, but MediaPipe and WebGL still need enough CPU/GPU budget.
-
-### CPU, RAM, or GPU telemetry is unsupported
-
-This is expected on some browsers. The app is frontend-only, so it cannot read native CPU/GPU usage or VRAM. Use the debug panel to see which values are browser estimates and which values are unavailable.
+See [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md).
