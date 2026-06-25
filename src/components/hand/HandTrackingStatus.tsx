@@ -32,7 +32,7 @@ function getGuidanceMessage(status: TrackingStatus, handsCount: number, errorMes
     return "Show your hand to the camera.";
   }
 
-  return "Pinch to move. Use two hands to scale or rotate.";
+  return "Touch thumb and index on the hologram to move. Use two hands to scale or rotate.";
 }
 
 export function HandTrackingStatus({
@@ -86,7 +86,7 @@ export function HandTrackingStatus({
           Show your hand
         </span>
         <span className="rounded-md border border-cyan-100/[0.12] bg-cyan-300/[0.08] px-2 py-1">
-          Pinch to move
+          Touch object to move
         </span>
         <span className="rounded-md border border-cyan-100/[0.12] bg-cyan-300/[0.08] px-2 py-1">
           Two hands scale/rotate

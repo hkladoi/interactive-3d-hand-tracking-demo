@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef } from "react";
 import { HAND_LANDMARK_CONNECTIONS, projectHandLandmark } from "@/lib/handLandmarks";
 import { cn } from "@/lib/cn";
 import { isFinitePoint, lerpPoint } from "@/lib/math";
-import type { Point2D, TrackedHand } from "@/lib/types";
+import type { GestureState, Point2D, TrackedHand } from "@/lib/types";
 
 type HandLandmarkOverlayProps = {
   className?: string;
+  gesture?: GestureState;
   hands: TrackedHand[];
   isMirrored?: boolean;
 };
@@ -124,12 +125,95 @@ function drawHand(
   context.restore();
 }
 
+function projectNormalizedPoint(
+  point: Point2D,
+  width: number,
+  height: number,
+  isMirrored: boolean
+): Point2D {
+  return {
+    x: (isMirrored ? 1 - point.x : point.x) * width,
+    y: point.y * height
+  };
+}
+
+function drawTouchIndicator(
+  context: CanvasRenderingContext2D,
+  gesture: GestureState | undefined,
+  width: number,
+  height: number,
+  isMirrored: boolean
+) {
+  const touch = gesture?.fingerTouch;
+
+  if (!touch?.thumbTip || !touch.indexTip || !touch.touchPoint) {
+    return;
+  }
+
+  const thumbTip = projectNormalizedPoint(touch.thumbTip, width, height, isMirrored);
+  const indexTip = projectNormalizedPoint(touch.indexTip, width, height, isMirrored);
+  const touchPoint = projectNormalizedPoint(touch.touchPoint, width, height, isMirrored);
+  const isObjectHit = Boolean(gesture?.objectTouch.isTouchingObject);
+  const glowColor = isObjectHit ? "251, 191, 36" : "45, 212, 191";
+
+  context.save();
+  context.lineCap = "round";
+  context.shadowBlur = touch.isTouching ? 22 : 10;
+  context.shadowColor = `rgba(${glowColor}, ${touch.isTouching ? 0.58 : 0.22})`;
+
+  context.beginPath();
+  context.moveTo(thumbTip.x, thumbTip.y);
+  context.lineTo(indexTip.x, indexTip.y);
+  context.strokeStyle = touch.isTouching
+    ? `rgba(${glowColor}, 0.92)`
+    : "rgba(255, 255, 255, 0.24)";
+  context.lineWidth = touch.isTouching ? 4 : 2;
+  context.stroke();
+
+  context.beginPath();
+  context.arc(touchPoint.x, touchPoint.y, touch.isTouching ? 13 : 8, 0, Math.PI * 2);
+  context.strokeStyle = touch.isTouching
+    ? `rgba(${glowColor}, 0.9)`
+    : "rgba(148, 163, 184, 0.45)";
+  context.lineWidth = 2;
+  context.stroke();
+
+  if (touch.isTouching) {
+    context.beginPath();
+    context.fillStyle = `rgba(${glowColor}, 0.82)`;
+    context.arc(touchPoint.x, touchPoint.y, 4.5, 0, Math.PI * 2);
+    context.fill();
+
+    const label = isObjectHit ? "OBJECT HIT" : "TOUCH";
+    context.font = "700 11px Inter, system-ui, sans-serif";
+    const metrics = context.measureText(label);
+    const boxWidth = metrics.width + 18;
+    const boxHeight = 24;
+    const x = touchPoint.x + 14;
+    const y = touchPoint.y - 12;
+
+    context.textBaseline = "middle";
+    context.fillStyle = "rgba(2, 6, 23, 0.82)";
+    context.strokeStyle = `rgba(${glowColor}, 0.72)`;
+    context.beginPath();
+    context.roundRect(x, y, boxWidth, boxHeight, 6);
+    context.fill();
+    context.stroke();
+    context.fillStyle = "rgba(240, 253, 250, 0.96)";
+    context.fillText(label, x + 9, y + boxHeight / 2);
+  }
+
+  context.restore();
+}
+
 export function HandLandmarkOverlay({
   className,
+  gesture,
   hands,
   isMirrored = true
 }: HandLandmarkOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gestureRef = useRef<GestureState | undefined>(gesture);
   const handsRef = useRef<readonly TrackedHand[]>(hands);
   const isMirroredRef = useRef(isMirrored);
   const animationFrameRef = useRef<number | null>(null);
@@ -168,6 +252,7 @@ export function HandLandmarkOverlay({
     });
 
     smoothedPointsRef.current = smoothedPointsRef.current.slice(0, currentHands.length);
+    drawTouchIndicator(context, gestureRef.current, width, height, isMirroredRef.current);
   }, []);
 
   const requestDraw = useCallback(() => {
@@ -185,6 +270,11 @@ export function HandLandmarkOverlay({
     handsRef.current = hands;
     requestDraw();
   }, [hands, requestDraw]);
+
+  useEffect(() => {
+    gestureRef.current = gesture;
+    requestDraw();
+  }, [gesture, requestDraw]);
 
   useEffect(() => {
     isMirroredRef.current = isMirrored;

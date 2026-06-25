@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clamp, normalizeAngle } from "@/lib/math";
+import {
+  getScreenSpaceObjectTouch,
+  mapScreenPointToThree,
+  mirrorNormalizedPoint
+} from "@/lib/raycast";
 import { smoothNumber, smoothTuple3 } from "@/lib/smoothing";
 import type { GestureState } from "@/lib/types";
 
@@ -18,8 +23,8 @@ const ROTATION_SMOOTHING = 0.18;
 const MIN_HOLOGRAM_SCALE = 0.5;
 const MAX_HOLOGRAM_SCALE = 2.5;
 
-type PinchDragSession = {
-  startPinchPosition: [number, number, number];
+type TouchDragSession = {
+  startTouchPosition: [number, number, number];
   startTransformPosition: [number, number, number];
 };
 
@@ -38,30 +43,26 @@ function createDefaultHologramTransform(): HologramTransform {
   };
 }
 
-function mapPinchPointToThreePosition(point: { x: number; y: number }): [number, number, number] {
-  const mirroredX = 1 - point.x;
-  const mappedX = (mirroredX - 0.5) * 4.6;
-  const mappedY = (0.5 - point.y) * 3.1;
-
-  return [clamp(mappedX, -2.2, 2.2), clamp(mappedY, -1.45, 1.45), 0];
+function mapTouchPointToThreePosition(point: { x: number; y: number }): [number, number, number] {
+  return mapScreenPointToThree(mirrorNormalizedPoint(point));
 }
 
-function getPinchDragTarget(
-  session: PinchDragSession,
-  currentPinchPosition: [number, number, number]
+function getTouchDragTarget(
+  session: TouchDragSession,
+  currentTouchPosition: [number, number, number]
 ): [number, number, number] {
   return [
     clamp(
       session.startTransformPosition[0] +
-        currentPinchPosition[0] -
-        session.startPinchPosition[0],
+        currentTouchPosition[0] -
+        session.startTouchPosition[0],
       -2.2,
       2.2
     ),
     clamp(
       session.startTransformPosition[1] +
-        currentPinchPosition[1] -
-        session.startPinchPosition[1],
+        currentTouchPosition[1] -
+        session.startTouchPosition[1],
       -1.45,
       1.45
     ),
@@ -70,12 +71,12 @@ function getPinchDragTarget(
 }
 
 export function useHologramControl(gesture: GestureState) {
-  const pinchSessionRef = useRef<PinchDragSession | null>(null);
+  const touchSessionRef = useRef<TouchDragSession | null>(null);
   const twoHandSessionRef = useRef<TwoHandSession | null>(null);
   const [transform, setTransform] = useState<HologramTransform>(createDefaultHologramTransform);
 
   const resetTransform = useCallback(() => {
-    pinchSessionRef.current = null;
+    touchSessionRef.current = null;
     twoHandSessionRef.current = null;
     setTransform(createDefaultHologramTransform());
   }, []);
@@ -88,7 +89,7 @@ export function useHologramControl(gesture: GestureState) {
           gesture.twoHandDistance !== null &&
           gesture.twoHandAngle !== null
         ) {
-          pinchSessionRef.current = null;
+          touchSessionRef.current = null;
 
           if (!twoHandSessionRef.current) {
             twoHandSessionRef.current = {
@@ -122,29 +123,50 @@ export function useHologramControl(gesture: GestureState) {
 
         twoHandSessionRef.current = null;
 
-        if (!gesture.isPinching || !gesture.pinchPoint) {
-          pinchSessionRef.current = null;
-          return current;
-        }
+        if (gesture.fingerTouch.isTouching && gesture.fingerTouch.touchPoint) {
+          const objectTouch = getScreenSpaceObjectTouch(gesture.fingerTouch.touchPoint, current);
 
-        const currentPinchPosition = mapPinchPointToThreePosition(gesture.pinchPoint);
+          if (!touchSessionRef.current && !objectTouch.isTouchingObject) {
+            return current;
+          }
 
-        if (!pinchSessionRef.current) {
-          pinchSessionRef.current = {
-            startPinchPosition: currentPinchPosition,
-            startTransformPosition: current.position
+          const currentTouchPosition = mapTouchPointToThreePosition(gesture.fingerTouch.touchPoint);
+
+          if (!touchSessionRef.current) {
+            touchSessionRef.current = {
+              startTouchPosition: currentTouchPosition,
+              startTransformPosition: current.position
+            };
+          }
+
+          const targetPosition = getTouchDragTarget(touchSessionRef.current, currentTouchPosition);
+          const targetRotation: [number, number, number] = [
+            targetPosition[1] * 0.18,
+            targetPosition[0] * -0.2,
+            current.rotation[2]
+          ];
+
+          return {
+            position: smoothTuple3(current.position, targetPosition, POSITION_SMOOTHING),
+            rotation: smoothTuple3(current.rotation, targetRotation, ROTATION_SMOOTHING),
+            scale: current.scale
           };
         }
 
-        const targetPosition = getPinchDragTarget(pinchSessionRef.current, currentPinchPosition);
+        touchSessionRef.current = null;
+
+        if (gesture.type !== "handRotate" || !gesture.handRotation) {
+          return current;
+        }
+
         const targetRotation: [number, number, number] = [
-          targetPosition[1] * 0.18,
-          targetPosition[0] * -0.2,
-          current.rotation[2]
+          current.rotation[0],
+          current.rotation[1] + gesture.handRotation.deltaAngle * 0.18,
+          normalizeAngle(current.rotation[2] - gesture.handRotation.deltaAngle * 0.85)
         ];
 
         return {
-          position: smoothTuple3(current.position, targetPosition, POSITION_SMOOTHING),
+          position: current.position,
           rotation: smoothTuple3(current.rotation, targetRotation, ROTATION_SMOOTHING),
           scale: current.scale
         };
@@ -157,7 +179,8 @@ export function useHologramControl(gesture: GestureState) {
   }, [gesture]);
 
   return {
-    isInteracting: gesture.isPinching || gesture.isTwoHandActive,
+    isInteracting:
+      gesture.fingerTouch.isTouching || gesture.isTwoHandActive || gesture.type === "handRotate",
     resetTransform,
     transform
   };

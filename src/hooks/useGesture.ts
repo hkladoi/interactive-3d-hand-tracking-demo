@@ -5,12 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { detectGesture, EMPTY_GESTURE_STATE, getDominantTwoHandType } from "@/lib/gestures";
 import { normalizeAngle } from "@/lib/math";
 import { smoothAngle, smoothNumber, smoothPoint } from "@/lib/smoothing";
-import type { GestureState, TrackedHand } from "@/lib/types";
+import type { FingerTouchState, GestureState, TrackedHand } from "@/lib/types";
 
-const PINCH_POINT_SMOOTHING = 0.45;
+const TOUCH_POINT_SMOOTHING = 0.45;
 const CONFIDENCE_SMOOTHING = 0.38;
 const TWO_HAND_DISTANCE_SMOOTHING = 0.28;
 const TWO_HAND_ANGLE_SMOOTHING = 0.24;
+const TOUCH_DISTANCE_SMOOTHING = 0.36;
 
 function getSmoothedTwoHandDistance(rawGesture: GestureState, previousGesture: GestureState) {
   if (!rawGesture.isTwoHandActive || rawGesture.twoHandDistance === null) {
@@ -44,13 +45,48 @@ function getSmoothedTwoHandAngle(rawGesture: GestureState, previousGesture: Gest
   );
 }
 
+function getSmoothedFingerTouch(
+  rawGesture: GestureState,
+  previousGesture: GestureState
+): FingerTouchState {
+  const rawTouch = rawGesture.fingerTouch;
+  const previousTouch = previousGesture.fingerTouch;
+  const previousDistance = Number.isFinite(previousTouch.distance)
+    ? previousTouch.distance
+    : rawTouch.distance;
+
+  return {
+    ...rawTouch,
+    confidence: smoothNumber(previousTouch.confidence, rawTouch.confidence, CONFIDENCE_SMOOTHING),
+    distance: Number.isFinite(rawTouch.distance)
+      ? smoothNumber(previousDistance, rawTouch.distance, TOUCH_DISTANCE_SMOOTHING)
+      : rawTouch.distance,
+    indexTip: rawTouch.indexTip
+      ? smoothPoint(previousTouch.indexTip, rawTouch.indexTip, TOUCH_POINT_SMOOTHING)
+      : null,
+    thumbTip: rawTouch.thumbTip
+      ? smoothPoint(previousTouch.thumbTip, rawTouch.thumbTip, TOUCH_POINT_SMOOTHING)
+      : null,
+    touchPoint: rawTouch.touchPoint
+      ? smoothPoint(previousTouch.touchPoint, rawTouch.touchPoint, TOUCH_POINT_SMOOTHING)
+      : null
+  };
+}
+
 export function useGesture(hands: readonly TrackedHand[]) {
   const previousGestureRef = useRef<GestureState>(EMPTY_GESTURE_STATE);
+  const touchCandidateFramesRef = useRef(0);
   const [gesture, setGesture] = useState<GestureState>(EMPTY_GESTURE_STATE);
 
   useEffect(() => {
-    const rawGesture = detectGesture(hands, previousGestureRef.current);
+    const detection = detectGesture(
+      hands,
+      previousGestureRef.current,
+      touchCandidateFramesRef.current
+    );
+    const rawGesture = detection.gesture;
     const previousGesture = previousGestureRef.current;
+    const fingerTouch = getSmoothedFingerTouch(rawGesture, previousGesture);
     const twoHandDistance = getSmoothedTwoHandDistance(rawGesture, previousGesture);
     const twoHandAngle = getSmoothedTwoHandAngle(rawGesture, previousGesture);
     const scaleDelta =
@@ -71,9 +107,10 @@ export function useGesture(hands: readonly TrackedHand[]) {
         rawGesture.confidence,
         CONFIDENCE_SMOOTHING
       ),
-      pinchPoint: rawGesture.pinchPoint
-        ? smoothPoint(previousGesture.pinchPoint, rawGesture.pinchPoint, PINCH_POINT_SMOOTHING)
-        : null,
+      fingerTouch,
+      isPinching: fingerTouch.isTouching,
+      pinchDistance: Number.isFinite(fingerTouch.distance) ? fingerTouch.distance : null,
+      pinchPoint: fingerTouch.touchPoint,
       rotationDelta,
       scaleDelta,
       twoHandAngle,
@@ -83,6 +120,7 @@ export function useGesture(hands: readonly TrackedHand[]) {
         : rawGesture.type
     };
 
+    touchCandidateFramesRef.current = detection.touchCandidateFrames;
     previousGestureRef.current = nextGesture;
     setGesture(nextGesture);
   }, [hands]);

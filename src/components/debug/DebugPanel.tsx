@@ -11,6 +11,7 @@ import {
   type CameraLayerVisibility
 } from "@/lib/camera";
 import { CAMERA_STATUS_COPY } from "@/lib/constants";
+import { getGestureLabel } from "@/lib/gestures";
 import { getTrackingStatusLabel } from "@/lib/handTracking";
 import type {
   CameraStatus,
@@ -58,6 +59,34 @@ function formatAngleRadians(angle: number | null) {
   }
 
   return `${Math.round((angle * 180) / Math.PI)}deg`;
+}
+
+function formatNumber(value: number | null, fractionDigits = 3) {
+  if (value === null || !Number.isFinite(value)) {
+    return "--";
+  }
+
+  return value.toFixed(fractionDigits);
+}
+
+function formatPercent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatPoint(point: { x: number; y: number } | null) {
+  if (!point) {
+    return "--";
+  }
+
+  return `${point.x.toFixed(3)}, ${point.y.toFixed(3)}`;
+}
+
+function formatTuple(tuple: [number, number, number] | null) {
+  if (!tuple) {
+    return "--";
+  }
+
+  return tuple.map((value) => value.toFixed(2)).join(", ");
 }
 
 export function DebugPanel({
@@ -114,6 +143,11 @@ export function DebugPanel({
       value: gesture.primaryHand ?? "--"
     },
     {
+      icon: Hand,
+      label: "Gesture",
+      value: getGestureLabel(gesture)
+    },
+    {
       icon: Cpu,
       label: "Tracking FPS",
       value: trackingFps > 0 ? String(trackingFps) : "--"
@@ -165,13 +199,79 @@ export function DebugPanel({
     },
     {
       icon: Crosshair,
-      label: "Pinch active",
-      value: gesture.isPinching ? "Yes" : "No"
+      label: "Finger touch",
+      value: gesture.fingerTouch.isTouching ? "Yes" : "No"
     },
     {
       icon: Crosshair,
-      label: "Pinch distance",
-      value: gesture.pinchDistance === null ? "--" : gesture.pinchDistance.toFixed(3)
+      label: "Touch distance",
+      value: formatNumber(gesture.fingerTouch.distance)
+    },
+    {
+      icon: Crosshair,
+      label: "Touch threshold",
+      value: gesture.fingerTouch.threshold.toFixed(3)
+    },
+    {
+      icon: Crosshair,
+      label: "Touch confidence",
+      value: formatPercent(gesture.fingerTouch.confidence)
+    },
+    {
+      icon: Crosshair,
+      label: "Touch point",
+      value: formatPoint(gesture.fingerTouch.touchPoint)
+    },
+    {
+      icon: Crosshair,
+      label: "Object touch",
+      value: gesture.objectTouch.isTouchingObject ? "Hit" : "No"
+    },
+    {
+      icon: Crosshair,
+      label: "Touch screen",
+      value: formatPoint(gesture.objectTouch.screenPoint)
+    },
+    {
+      icon: Crosshair,
+      label: "Touch world",
+      value: formatTuple(gesture.objectTouch.worldPoint)
+    },
+    {
+      icon: Crosshair,
+      label: "Touch local",
+      value: formatTuple(gesture.objectTouch.localPoint)
+    },
+    {
+      icon: Crosshair,
+      label: "Hand rotation",
+      value: gesture.handRotation?.direction ?? "neutral"
+    },
+    {
+      icon: Crosshair,
+      label: "Hand angle",
+      value: formatAngleRadians(gesture.handRotation?.screenAngle ?? null)
+    },
+    {
+      icon: Crosshair,
+      label: "Hand delta",
+      value: formatAngleRadians(gesture.handRotation?.deltaAngle ?? null)
+    },
+    {
+      icon: Crosshair,
+      label: "Hand pose",
+      value: gesture.handRotation
+        ? [
+            gesture.handRotation.yaw.toFixed(2),
+            gesture.handRotation.pitch.toFixed(2),
+            gesture.handRotation.roll.toFixed(2)
+          ].join(", ")
+        : "--"
+    },
+    {
+      icon: Crosshair,
+      label: "Hand confidence",
+      value: gesture.handRotation ? formatPercent(gesture.handRotation.confidence) : "--"
     },
     {
       icon: Crosshair,

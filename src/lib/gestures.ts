@@ -1,3 +1,6 @@
+import { EMPTY_OBJECT_TOUCH_STATE } from "@/lib/raycast";
+import { EMPTY_FINGER_TOUCH_STATE, detectFingerTouch } from "@/lib/touchDetection";
+import { getHandRotationState } from "@/lib/handPose";
 import { clamp, getPointDistance, normalizeAngle } from "@/lib/math";
 import type {
   GestureState,
@@ -7,21 +10,22 @@ import type {
   TrackedHand
 } from "@/lib/types";
 
-const THUMB_TIP_INDEX = 4;
-const INDEX_TIP_INDEX = 8;
 const WRIST_INDEX = 0;
 const INDEX_MCP_INDEX = 5;
 const MIDDLE_MCP_INDEX = 9;
 const PINKY_MCP_INDEX = 17;
-const PINCH_ON_THRESHOLD = 0.34;
-const PINCH_OFF_THRESHOLD = 0.44;
 const TWO_HAND_ROTATION_DEAD_ZONE = 0.025;
 const TWO_HAND_SCALE_DEAD_ZONE = 0.015;
+const HAND_ROTATION_MIN_CONFIDENCE = 0.28;
 
 export const EMPTY_GESTURE_STATE = {
   confidence: 0,
+  fingerTouch: EMPTY_FINGER_TOUCH_STATE,
+  handRotation: null,
+  isDragging: false,
   isPinching: false,
   isTwoHandActive: false,
+  objectTouch: EMPTY_OBJECT_TOUCH_STATE,
   pinchDistance: null,
   pinchPoint: null,
   primaryHand: null,
@@ -32,19 +36,16 @@ export const EMPTY_GESTURE_STATE = {
   type: "none"
 } satisfies GestureState;
 
-export type PinchMetrics = Readonly<{
-  confidence: number;
-  distance: number;
-  isPinching: boolean;
-  normalizedDistance: number;
-  pinchPoint: Point2D;
-}>;
-
 type HandAnchor = Readonly<{
   center: Point2D;
   hand: TrackedHand;
   screenCenter: Point2D;
   scale: number;
+}>;
+
+export type GestureDetectionResult = Readonly<{
+  gesture: GestureState;
+  touchCandidateFrames: number;
 }>;
 
 export type TwoHandMetrics = Readonly<{
@@ -61,13 +62,6 @@ export function getLandmarkDistance(a: HandLandmark, b: HandLandmark) {
   const deltaZ = (a.z ?? 0) - (b.z ?? 0);
 
   return Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-}
-
-export function getPointBetween(a: HandLandmark, b: HandLandmark): Point2D {
-  return {
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2
-  };
 }
 
 function getAveragePoint(landmarks: readonly HandLandmark[], landmarkIndexes: readonly number[]) {
@@ -110,37 +104,6 @@ export function getPalmCenter(landmarks: readonly HandLandmark[]) {
     MIDDLE_MCP_INDEX,
     PINKY_MCP_INDEX
   ]);
-}
-
-export function getPinchMetrics(
-  hand: TrackedHand,
-  wasPinching: boolean
-): PinchMetrics | null {
-  const thumbTip = hand.landmarks[THUMB_TIP_INDEX];
-  const indexTip = hand.landmarks[INDEX_TIP_INDEX];
-  const handScale = getHandScale(hand.landmarks);
-
-  if (!thumbTip || !indexTip || !handScale) {
-    return null;
-  }
-
-  const distance = getLandmarkDistance(thumbTip, indexTip);
-  const normalizedDistance = distance / handScale;
-  const activeThreshold = wasPinching ? PINCH_OFF_THRESHOLD : PINCH_ON_THRESHOLD;
-  const isPinching = normalizedDistance < activeThreshold;
-  const confidence = clamp(
-    (PINCH_OFF_THRESHOLD - normalizedDistance) / (PINCH_OFF_THRESHOLD - PINCH_ON_THRESHOLD),
-    0,
-    1
-  );
-
-  return {
-    confidence,
-    distance,
-    isPinching,
-    normalizedDistance,
-    pinchPoint: getPointBetween(thumbTip, indexTip)
-  };
 }
 
 function getHandAnchor(hand: TrackedHand): HandAnchor | null {
@@ -236,14 +199,34 @@ export function pickPrimaryHand(hands: readonly TrackedHand[]) {
   }, null);
 }
 
+function getSingleHandGestureType(gesture: GestureState): GestureType {
+  if (gesture.fingerTouch.isTouching) {
+    return "touch";
+  }
+
+  if (
+    gesture.handRotation &&
+    gesture.handRotation.direction !== "neutral" &&
+    gesture.handRotation.confidence >= HAND_ROTATION_MIN_CONFIDENCE
+  ) {
+    return "handRotate";
+  }
+
+  return "hover";
+}
+
 export function detectGesture(
   hands: readonly TrackedHand[],
-  previousGesture: GestureState = EMPTY_GESTURE_STATE
-): GestureState {
+  previousGesture: GestureState = EMPTY_GESTURE_STATE,
+  previousTouchCandidateFrames = 0
+): GestureDetectionResult {
   const primaryHand = pickPrimaryHand(hands);
 
   if (!primaryHand) {
-    return EMPTY_GESTURE_STATE;
+    return {
+      gesture: EMPTY_GESTURE_STATE,
+      touchCandidateFrames: 0
+    };
   }
 
   if (hands.length >= 2) {
@@ -251,64 +234,72 @@ export function detectGesture(
 
     if (twoHand) {
       return {
-        confidence: twoHand.confidence,
-        isPinching: false,
-        isTwoHandActive: true,
-        pinchDistance: null,
-        pinchPoint: null,
-        primaryHand: primaryHand.handedness,
-        rotationDelta: twoHand.rotationDelta,
-        scaleDelta: twoHand.scaleDelta,
-        twoHandAngle: twoHand.angle,
-        twoHandDistance: twoHand.distance,
-        type: getDominantTwoHandType(
-          twoHand.scaleDelta,
-          twoHand.rotationDelta,
-          previousGesture.type
-        )
+        gesture: {
+          ...EMPTY_GESTURE_STATE,
+          confidence: twoHand.confidence,
+          isTwoHandActive: true,
+          primaryHand: primaryHand.handedness,
+          rotationDelta: twoHand.rotationDelta,
+          scaleDelta: twoHand.scaleDelta,
+          twoHandAngle: twoHand.angle,
+          twoHandDistance: twoHand.distance,
+          type: getDominantTwoHandType(
+            twoHand.scaleDelta,
+            twoHand.rotationDelta,
+            previousGesture.type
+          )
+        },
+        touchCandidateFrames: 0
       };
     }
   }
 
-  const pinch = getPinchMetrics(
+  const touch = detectFingerTouch(
     primaryHand,
-    previousGesture.type === "pinch" && previousGesture.isPinching
+    previousGesture.fingerTouch,
+    previousTouchCandidateFrames
   );
-
-  if (!pinch) {
-    return {
-      ...EMPTY_GESTURE_STATE,
-      primaryHand: primaryHand.handedness
-    };
-  }
+  const handRotation = getHandRotationState(primaryHand, previousGesture.handRotation);
+  const confidence = Math.max(
+    touch.state.confidence,
+    handRotation ? handRotation.confidence * 0.72 : 0.18
+  );
+  const gesture: GestureState = {
+    ...EMPTY_GESTURE_STATE,
+    confidence,
+    fingerTouch: touch.state,
+    handRotation,
+    isPinching: touch.state.isTouching,
+    pinchDistance: Number.isFinite(touch.state.distance) ? touch.state.distance : null,
+    pinchPoint: touch.state.touchPoint,
+    primaryHand: primaryHand.handedness
+  };
 
   return {
-    confidence: pinch.confidence,
-    isPinching: pinch.isPinching,
-    isTwoHandActive: false,
-    pinchDistance: pinch.normalizedDistance,
-    pinchPoint: pinch.pinchPoint,
-    primaryHand: primaryHand.handedness,
-    rotationDelta: 0,
-    scaleDelta: 0,
-    twoHandAngle: null,
-    twoHandDistance: null,
-    type: pinch.isPinching ? "pinch" : "none"
+    gesture: {
+      ...gesture,
+      type: getSingleHandGestureType(gesture)
+    },
+    touchCandidateFrames: touch.candidateFrames
   };
 }
 
 export function getGestureLabel(gesture: GestureState) {
-  if (gesture.type === "pinch") {
-    return "Pinch";
+  switch (gesture.type) {
+    case "drag":
+      return "Drag";
+    case "handRotate":
+      return "Hand rotate";
+    case "hover":
+      return "Hover";
+    case "touch":
+      return "Touch";
+    case "twoHandRotate":
+      return "Two-hand rotate";
+    case "twoHandScale":
+      return "Two-hand scale";
+    case "none":
+    default:
+      return "None";
   }
-
-  if (gesture.type === "twoHandRotate") {
-    return "Two-hand rotate";
-  }
-
-  if (gesture.type === "twoHandScale") {
-    return "Two-hand scale";
-  }
-
-  return "None";
 }

@@ -29,3 +29,11 @@ export function isFinitePoint(point: Point2D) {
 export function normalizeAngle(angle: number) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
+
+export function normalizeAngleRad(angle: number) {
+  return normalizeAngle(angle);
+}
+
+export function lerpAngleRad(from: number, to: number, factor: number) {
+  return from + normalizeAngleRad(to - from) * factor;
+}

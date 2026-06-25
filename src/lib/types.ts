@@ -15,12 +15,53 @@ export type TrackingStatus =
   | "unsupported"
   | "error";
 
-export type GestureType = "none" | "pinch" | "twoHandScale" | "twoHandRotate";
+export type GestureType =
+  | "none"
+  | "hover"
+  | "touch"
+  | "drag"
+  | "twoHandScale"
+  | "twoHandRotate"
+  | "handRotate";
+
+export type FingerTouchState = {
+  confidence: number;
+  distance: number;
+  indexTip: Point2D | null;
+  isTouching: boolean;
+  threshold: number;
+  thumbTip: Point2D | null;
+  touchPoint: Point2D | null;
+};
+
+export type HandRotationDirection = "clockwise" | "counterClockwise" | "neutral";
+
+export type HandRotationState = {
+  confidence: number;
+  deltaAngle: number;
+  direction: HandRotationDirection;
+  pitch: number;
+  roll: number;
+  screenAngle: number;
+  yaw: number;
+};
+
+export type ObjectTouchState = {
+  isTouchingObject: boolean;
+  localPoint: [number, number, number] | null;
+  normal?: [number, number, number] | null;
+  screenPoint: Point2D | null;
+  worldPoint: [number, number, number] | null;
+};
 
 export type GestureState = {
   confidence: number;
+  fingerTouch: FingerTouchState;
+  handRotation: HandRotationState | null;
+  isDragging: boolean;
   isPinching: boolean;
   isTwoHandActive: boolean;
+  objectTouch: ObjectTouchState;
   pinchDistance: number | null;
   pinchPoint: Point2D | null;
   primaryHand: "Left" | "Right" | "Unknown" | null;

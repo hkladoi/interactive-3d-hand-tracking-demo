@@ -4,12 +4,15 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Preload } from "@react-three/drei";
 
 import { PlaceholderHologram } from "@/components/three/PlaceholderHologram";
+import { TouchPointMarker } from "@/components/three/TouchPointMarker";
 import type { HologramTransform } from "@/hooks/useHologramControl";
 import { cn } from "@/lib/cn";
+import type { ObjectTouchState } from "@/lib/types";
 
 type ThreeViewportProps = {
   className?: string;
   isInteracting: boolean;
+  objectTouch: ObjectTouchState;
   transform: HologramTransform;
   visible: boolean;
 };
@@ -17,6 +20,7 @@ type ThreeViewportProps = {
 export function ThreeViewport({
   className,
   isInteracting,
+  objectTouch,
   transform,
   visible
 }: ThreeViewportProps) {
@@ -40,6 +44,7 @@ export function ThreeViewport({
         <pointLight color="#2dd4bf" intensity={26} position={[-2.6, 1.2, 2.6]} />
         <pointLight color="#fbbf24" intensity={14} position={[-3, -1.4, 2]} />
         <PlaceholderHologram isInteracting={isInteracting} transform={transform} />
+        <TouchPointMarker objectTouch={objectTouch} />
         <OrbitControls
           enableDamping
           enablePan={false}

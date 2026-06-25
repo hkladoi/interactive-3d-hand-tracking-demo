@@ -39,6 +39,14 @@ type StatusItem = {
   value: string;
 };
 
+function getHandRotationLabel(gesture: GestureState) {
+  if (!gesture.handRotation || gesture.handRotation.direction === "neutral") {
+    return "Neutral";
+  }
+
+  return gesture.handRotation.direction === "clockwise" ? "Clockwise" : "Counter";
+}
+
 export function ARStatusBar({
   cameraStatus,
   fps,
@@ -49,7 +57,10 @@ export function ARStatusBar({
   trackingStatus
 }: ARStatusBarProps) {
   const cameraCopy = CAMERA_STATUS_COPY[cameraStatus];
-  const confidenceLabel = `${Math.round(gesture.confidence * 100)}%`;
+  const touchLabel = gesture.fingerTouch.isTouching
+    ? `${Math.round(gesture.fingerTouch.confidence * 100)}%`
+    : "Open";
+  const handRotationLabel = getHandRotationLabel(gesture);
   const rotationLabel = `${Math.round((hologramTransform.rotation[2] * 180) / Math.PI)}deg`;
   const items: StatusItem[] = [
     {
@@ -73,14 +84,26 @@ export function ARStatusBar({
     {
       icon: Activity,
       label: "Gesture",
-      tone: gesture.isPinching || gesture.isTwoHandActive ? "success" : "neutral",
+      tone:
+        gesture.isDragging ||
+        gesture.fingerTouch.isTouching ||
+        gesture.isTwoHandActive ||
+        gesture.type === "handRotate"
+          ? "success"
+          : "neutral",
       value: getGestureLabel(gesture)
     },
     {
       icon: Activity,
-      label: "Confidence",
-      tone: gesture.confidence > 0.55 ? "success" : "neutral",
-      value: confidenceLabel
+      label: "Touch",
+      tone: gesture.fingerTouch.isTouching ? "success" : "neutral",
+      value: touchLabel
+    },
+    {
+      icon: ScanSearch,
+      label: "Object",
+      tone: gesture.objectTouch.isTouchingObject ? "success" : "neutral",
+      value: gesture.objectTouch.isTouchingObject ? "Hit" : "--"
     },
     {
       icon: ScanSearch,
@@ -93,6 +116,12 @@ export function ARStatusBar({
       label: "Rotation",
       tone: "info",
       value: rotationLabel
+    },
+    {
+      icon: Activity,
+      label: "Hand rot",
+      tone: gesture.type === "handRotate" ? "success" : "neutral",
+      value: handRotationLabel
     },
     {
       icon: TimerReset,
@@ -131,7 +160,7 @@ export function ARStatusBar({
       aria-label="AR status bar"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-100/[0.12] bg-black/48 px-3 py-2 shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:px-6 sm:py-3"
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-11">
+      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-[repeat(13,minmax(0,1fr))]">
         {items.map((item) => {
           const Icon = item.icon;
 

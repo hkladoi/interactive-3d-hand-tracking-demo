@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ARHeader } from "@/components/ar/ARHeader";
 import { ARStatusBar } from "@/components/ar/ARStatusBar";
@@ -18,13 +18,14 @@ import { useGesture } from "@/hooks/useGesture";
 import { useHandTracking } from "@/hooks/useHandTracking";
 import { useHologramControl } from "@/hooks/useHologramControl";
 import { useSystemResources } from "@/hooks/useSystemResources";
+import { useTouchProjection } from "@/hooks/useTouchProjection";
 import {
   DEFAULT_CAMERA_LAYER_VISIBILITY,
   TRACKING_UNAVAILABLE_OVERLAY_SNAPSHOT,
   type CameraLayerKey,
   type CameraLayerVisibility
 } from "@/lib/camera";
-import type { CameraFallbackStatus, TrackingStatus } from "@/lib/types";
+import type { CameraFallbackStatus, GestureState, TrackingStatus } from "@/lib/types";
 
 const DynamicThreeViewport = dynamic(
   () => import("@/components/three/ThreeViewport").then((module) => module.ThreeViewport),
@@ -54,12 +55,23 @@ export function ARExperience() {
     status: trackingStatus,
     stopTracking
   } = useHandTracking(cameraVideoRef);
-  const gesture = useGesture(hands);
+  const rawGesture = useGesture(hands);
   const {
     isInteracting,
     resetTransform,
     transform: hologramTransform
-  } = useHologramControl(gesture);
+  } = useHologramControl(rawGesture);
+  const objectTouch = useTouchProjection(rawGesture, hologramTransform);
+  const gesture = useMemo<GestureState>(() => {
+    const isDragging = rawGesture.fingerTouch.isTouching && objectTouch.isTouchingObject;
+
+    return {
+      ...rawGesture,
+      isDragging,
+      objectTouch,
+      type: rawGesture.type === "touch" && isDragging ? "drag" : rawGesture.type
+    };
+  }, [objectTouch, rawGesture]);
   const systemResources = useSystemResources();
   const [isDebugOpen, setIsDebugOpen] = useState(true);
   const [layerVisibility, setLayerVisibility] = useState<CameraLayerVisibility>(
@@ -119,6 +131,7 @@ export function ARExperience() {
       <DynamicThreeViewport
         className="z-10"
         isInteracting={isInteracting}
+        objectTouch={gesture.objectTouch}
         transform={hologramTransform}
         visible={layerVisibility.showHologram}
       />
@@ -130,7 +143,7 @@ export function ARExperience() {
             snapshot={TRACKING_UNAVAILABLE_OVERLAY_SNAPSHOT}
           />
         ) : (
-          <HandLandmarkOverlay className="z-20" hands={hands} />
+          <HandLandmarkOverlay className="z-20" gesture={gesture} hands={hands} />
         )
       ) : null}
 

@@ -1,6 +1,6 @@
 # Interactive 3D Hand Tracking
 
-An interactive browser AR demo built with Next.js, MediaPipe hand tracking, and a transparent Three.js hologram layer. The app runs fully on the client: camera frames stay local in the browser, hand landmarks drive gestures, and the 3D object responds to pinch drag plus two-hand scale and rotate.
+An interactive browser AR demo built with Next.js, MediaPipe hand tracking, and a transparent Three.js hologram layer. The app runs fully on the client: camera frames stay local in the browser, hand landmarks drive gestures, and the 3D object responds to real thumb-index touch, object hit detection, one-hand rotate, plus two-hand scale and rotate.
 
 ## Tech Stack
 
@@ -47,6 +47,7 @@ src/
       ParticleField.tsx
       PlaceholderHologram.tsx
       ThreeViewport.tsx
+      TouchPointMarker.tsx
     ui/
       Badge.tsx
       Button.tsx
@@ -58,17 +59,21 @@ src/
     useHandTracking.ts
     useHologramControl.ts
     useSystemResources.ts
+    useTouchProjection.ts
     useVideoElement.ts
   lib/
     camera.ts
     cn.ts
     constants.ts
     gestures.ts
+    handPose.ts
     handLandmarks.ts
     handTracking.ts
     math.ts
+    raycast.ts
     smoothing.ts
     systemResources.ts
+    touchDetection.ts
     types.ts
 public/
   mediapipe/
@@ -130,12 +135,15 @@ If `DEFAULT_MODEL_URL` is empty or the model fails to load, the app renders the 
 - Transparent Three.js AR layer
 - Hologram object with wireframe, glow, particles, and rings
 - Optional `.glb` or `.gltf` hologram model with built-in fallback
-- Pinch drag for moving the hologram
+- Thumb-index touch detection with dynamic hand-size thresholds and hysteresis
+- Screen-space object hit detection before drag starts
+- Touch marker on the hologram when the hand contact hits the object
+- One-hand palm rotation for rotating the hologram
 - Two-hand scale and rotate
 - Browser-safe CPU, RAM, and GPU telemetry next to FPS
 - Debug panel with layer toggles, gesture data, FPS, and reset
 - Compact mobile status bar and collapsible debug UI
-- Production hints for loading, no-hand, pinch, and two-hand gestures
+- Production hints for loading, no-hand, touch, one-hand rotate, and two-hand gestures
 
 ## System Telemetry
 
@@ -150,11 +158,21 @@ Unsupported values are shown explicitly instead of being guessed.
 ## Gesture Guide
 
 - Show your hand to the camera to activate tracking.
-- Pinch thumb tip and index finger tip to move the hologram.
+- Touch thumb tip and index finger tip together on top of the hologram to start dragging.
+- Touching outside the hologram shows a touch state, but it will not move the object.
+- Rotate one visible hand to rotate the hologram without touching it.
 - Use two hands and move them farther apart or closer together to scale the hologram.
 - Rotate two hands around each other to rotate the hologram.
 - Use Reset hologram to restore position, rotation, and scale.
 - Use Stop Camera to stop both the camera stream and tracking loop.
+
+## Gesture Architecture
+
+- `touchDetection.ts` computes real thumb-index contact using palm-relative thresholds, hysteresis, and candidate frames.
+- `handPose.ts` computes mirrored screen-space palm angle plus coarse yaw, pitch, and roll for one-hand rotation.
+- `raycast.ts` currently performs lightweight screen-space object hit detection for the hologram and custom models.
+- `useGesture.ts` exposes hover, touch, drag, one-hand rotate, and two-hand gestures without UI-specific logic.
+- `useHologramControl.ts` maps gestures into a smoothed Three.js transform and clamps scale between `0.5` and `2.5`.
 
 ## Troubleshooting
 
@@ -176,7 +194,11 @@ Check that the file exists under `public/models` and that `DEFAULT_MODEL_URL` st
 
 ### No hand detected
 
-Move your hand into the camera view with good lighting. Keep the palm and fingers visible for the first detection, then try the pinch or two-hand gestures.
+Move your hand into the camera view with good lighting. Keep the palm and fingers visible for the first detection, then try touch, one-hand rotate, or two-hand gestures.
+
+### Touch does not move the object
+
+Make sure the thumb-index contact point is over the hologram. The app intentionally requires a real contact plus object hit before drag starts, so near-but-not-touching fingers or touches outside the object will not move it.
 
 ### Low performance
 
