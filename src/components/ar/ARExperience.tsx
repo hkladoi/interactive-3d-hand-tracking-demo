@@ -17,6 +17,7 @@ import { useClientReady } from "@/hooks/useClientReady";
 import { useGesture } from "@/hooks/useGesture";
 import { useHandTracking } from "@/hooks/useHandTracking";
 import { useHologramControl } from "@/hooks/useHologramControl";
+import { useSystemResources } from "@/hooks/useSystemResources";
 import {
   DEFAULT_CAMERA_LAYER_VISIBILITY,
   TRACKING_UNAVAILABLE_OVERLAY_SNAPSHOT,
@@ -59,6 +60,7 @@ export function ARExperience() {
     resetTransform,
     transform: hologramTransform
   } = useHologramControl(gesture);
+  const systemResources = useSystemResources();
   const [isDebugOpen, setIsDebugOpen] = useState(true);
   const [layerVisibility, setLayerVisibility] = useState<CameraLayerVisibility>(
     DEFAULT_CAMERA_LAYER_VISIBILITY
@@ -158,6 +160,7 @@ export function ARExperience() {
         layerVisibility={layerVisibility}
         onResetTransform={resetTransform}
         onToggleLayer={toggleLayer}
+        systemResources={systemResources}
         trackingFps={fps}
         trackingStatus={trackingStatus}
         stream={stream}
@@ -169,6 +172,7 @@ export function ARExperience() {
           gesture={gesture}
           handsCount={hands.length}
           hologramTransform={hologramTransform}
+          systemResources={systemResources}
           trackingStatus={trackingStatus}
         />
       ) : null}

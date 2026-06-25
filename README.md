@@ -57,6 +57,7 @@ src/
     useGesture.ts
     useHandTracking.ts
     useHologramControl.ts
+    useSystemResources.ts
     useVideoElement.ts
   lib/
     camera.ts
@@ -67,6 +68,7 @@ src/
     handTracking.ts
     math.ts
     smoothing.ts
+    systemResources.ts
     types.ts
 public/
   mediapipe/
@@ -130,9 +132,20 @@ If `DEFAULT_MODEL_URL` is empty or the model fails to load, the app renders the 
 - Optional `.glb` or `.gltf` hologram model with built-in fallback
 - Pinch drag for moving the hologram
 - Two-hand scale and rotate
+- Browser-safe CPU, RAM, and GPU telemetry next to FPS
 - Debug panel with layer toggles, gesture data, FPS, and reset
 - Compact mobile status bar and collapsible debug UI
 - Production hints for loading, no-hand, pinch, and two-hand gestures
+
+## System Telemetry
+
+The status bar shows CPU, RAM, and GPU next to FPS using browser-safe APIs only:
+
+- CPU shows logical core count from `navigator.hardwareConcurrency`; CPU name and usage are not exposed by browsers.
+- RAM shows an estimate from `navigator.deviceMemory` and JavaScript heap usage from `performance.memory` when supported.
+- GPU shows the WebGL renderer name when `WEBGL_debug_renderer_info` is available; GPU usage and VRAM are not exposed by browsers.
+
+Unsupported values are shown explicitly instead of being guessed.
 
 ## Gesture Guide
 
@@ -168,3 +181,7 @@ Move your hand into the camera view with good lighting. Keep the palm and finger
 ### Low performance
 
 Close other camera or GPU-heavy apps, reduce browser tabs, and use a desktop Chromium browser when possible. The demo uses a lightweight particle field and avoids heavy external assets, but MediaPipe and WebGL still need enough CPU/GPU budget.
+
+### CPU, RAM, or GPU telemetry is unsupported
+
+This is expected on some browsers. The app is frontend-only, so it cannot read native CPU/GPU usage or VRAM. Use the debug panel to see which values are browser estimates and which values are unavailable.

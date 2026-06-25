@@ -1,13 +1,24 @@
 "use client";
 
-import { Activity, Camera, Hand, ScanSearch, TimerReset } from "lucide-react";
+import { Activity, Camera, Cpu, Hand, ScanSearch, TimerReset } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import type { HologramTransform } from "@/hooks/useHologramControl";
 import { CAMERA_STATUS_COPY } from "@/lib/constants";
 import { getGestureLabel } from "@/lib/gestures";
 import { getTrackingStatusLabel, getTrackingStatusTone } from "@/lib/handTracking";
-import type { CameraStatus, GestureState, StatusTone, TrackingStatus } from "@/lib/types";
+import {
+  getCompactSystemMetricValue,
+  getSystemMetricAriaLabel,
+  getSystemMetricTone
+} from "@/lib/systemResources";
+import type {
+  CameraStatus,
+  GestureState,
+  StatusTone,
+  SystemResourceStats,
+  TrackingStatus
+} from "@/lib/types";
 
 type ARStatusBarProps = {
   cameraStatus: CameraStatus;
@@ -15,12 +26,15 @@ type ARStatusBarProps = {
   gesture: GestureState;
   handsCount: number;
   hologramTransform: HologramTransform;
+  systemResources: SystemResourceStats;
   trackingStatus: TrackingStatus;
 };
 
 type StatusItem = {
+  ariaLabel?: string;
   icon: typeof Camera;
   label: string;
+  title?: string;
   tone: StatusTone;
   value: string;
 };
@@ -31,6 +45,7 @@ export function ARStatusBar({
   gesture,
   handsCount,
   hologramTransform,
+  systemResources,
   trackingStatus
 }: ARStatusBarProps) {
   const cameraCopy = CAMERA_STATUS_COPY[cameraStatus];
@@ -84,6 +99,30 @@ export function ARStatusBar({
       label: "FPS",
       tone: "info",
       value: fps > 0 ? String(fps) : "--"
+    },
+    {
+      ariaLabel: getSystemMetricAriaLabel("CPU", systemResources.cpu),
+      icon: Cpu,
+      label: "CPU",
+      title: systemResources.cpu.detail,
+      tone: getSystemMetricTone(systemResources.cpu),
+      value: getCompactSystemMetricValue(systemResources.cpu, "name")
+    },
+    {
+      ariaLabel: getSystemMetricAriaLabel("RAM", systemResources.ram),
+      icon: Activity,
+      label: "RAM",
+      title: systemResources.ram.detail,
+      tone: getSystemMetricTone(systemResources.ram),
+      value: getCompactSystemMetricValue(systemResources.ram, "memory")
+    },
+    {
+      ariaLabel: getSystemMetricAriaLabel("GPU", systemResources.gpu),
+      icon: ScanSearch,
+      label: "GPU",
+      title: systemResources.gpu.detail,
+      tone: getSystemMetricTone(systemResources.gpu),
+      value: getCompactSystemMetricValue(systemResources.gpu, "name")
     }
   ];
 
@@ -92,21 +131,25 @@ export function ARStatusBar({
       aria-label="AR status bar"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-100/[0.12] bg-black/48 px-3 py-2 shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:px-6 sm:py-3"
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-11">
         {items.map((item) => {
           const Icon = item.icon;
 
           return (
             <div
-              aria-label={`${item.label}: ${item.value}`}
+              aria-label={item.ariaLabel ?? `${item.label}: ${item.value}`}
               className="flex min-w-0 flex-col items-start gap-1 rounded-md border border-cyan-100/[0.12] bg-white/[0.055] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-3"
               key={item.label}
+              title={item.title}
             >
               <div className="flex min-w-0 items-center gap-2">
                 <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-100/75" />
                 <span className="hidden text-xs text-neutral-300 sm:inline">{item.label}</span>
               </div>
-              <Badge className="min-h-6 shrink-0 px-2 py-0.5 text-[0.68rem]" tone={item.tone}>
+              <Badge
+                className="min-h-6 max-w-full shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-0.5 text-[0.68rem]"
+                tone={item.tone}
+              >
                 {item.value}
               </Badge>
             </div>

@@ -49,6 +49,23 @@ export type TrackedHand = {
 
 export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info";
 
+export type SystemMetricStatus = "available" | "estimated" | "unsupported";
+
+export type SystemResourceMetric = {
+  detail: string;
+  memory: string;
+  name: string;
+  status: SystemMetricStatus;
+  usage: string;
+};
+
+export type SystemResourceStats = {
+  cpu: SystemResourceMetric;
+  gpu: SystemResourceMetric;
+  ram: SystemResourceMetric;
+  updatedAt: number;
+};
+
 export type CameraFallbackStatus = Extract<CameraStatus, "denied" | "unsupported" | "error">;
 
 export type CameraStatusCopy = {

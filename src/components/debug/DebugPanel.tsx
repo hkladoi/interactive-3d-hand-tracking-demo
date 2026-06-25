@@ -12,7 +12,12 @@ import {
 } from "@/lib/camera";
 import { CAMERA_STATUS_COPY } from "@/lib/constants";
 import { getTrackingStatusLabel } from "@/lib/handTracking";
-import type { CameraStatus, GestureState, TrackingStatus } from "@/lib/types";
+import type {
+  CameraStatus,
+  GestureState,
+  SystemResourceStats,
+  TrackingStatus
+} from "@/lib/types";
 
 type DebugPanelProps = {
   cameraStatus: CameraStatus;
@@ -24,6 +29,7 @@ type DebugPanelProps = {
   layerVisibility: CameraLayerVisibility;
   onResetTransform: () => void;
   onToggleLayer: (key: CameraLayerKey) => void;
+  systemResources: SystemResourceStats;
   trackingFps: number;
   trackingStatus: TrackingStatus;
   stream: MediaStream | null;
@@ -64,6 +70,7 @@ export function DebugPanel({
   layerVisibility,
   onResetTransform,
   onToggleLayer,
+  systemResources,
   trackingFps,
   trackingStatus,
   stream
@@ -110,6 +117,51 @@ export function DebugPanel({
       icon: Cpu,
       label: "Tracking FPS",
       value: trackingFps > 0 ? String(trackingFps) : "--"
+    },
+    {
+      icon: Cpu,
+      label: "CPU name",
+      value: systemResources.cpu.name
+    },
+    {
+      icon: Cpu,
+      label: "CPU usage",
+      value: systemResources.cpu.usage
+    },
+    {
+      icon: Cpu,
+      label: "CPU memory",
+      value: systemResources.cpu.memory
+    },
+    {
+      icon: Cpu,
+      label: "RAM name",
+      value: systemResources.ram.name
+    },
+    {
+      icon: Cpu,
+      label: "RAM usage",
+      value: systemResources.ram.usage
+    },
+    {
+      icon: Cpu,
+      label: "RAM memory",
+      value: systemResources.ram.memory
+    },
+    {
+      icon: Cpu,
+      label: "GPU name",
+      value: systemResources.gpu.name
+    },
+    {
+      icon: Cpu,
+      label: "GPU usage",
+      value: systemResources.gpu.usage
+    },
+    {
+      icon: Cpu,
+      label: "GPU memory",
+      value: systemResources.gpu.memory
     },
     {
       icon: Crosshair,
@@ -184,7 +236,12 @@ export function DebugPanel({
                   <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                   <span className="truncate text-xs text-neutral-300">{row.label}</span>
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-teal-100">{row.value}</span>
+                <span
+                  className="max-w-[12rem] shrink-0 truncate text-right text-xs font-semibold text-teal-100"
+                  title={row.value}
+                >
+                  {row.value}
+                </span>
               </div>
             );
           })}
